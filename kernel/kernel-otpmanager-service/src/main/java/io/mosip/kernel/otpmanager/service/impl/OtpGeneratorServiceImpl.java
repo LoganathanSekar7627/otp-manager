@@ -89,6 +89,7 @@ public class OtpGeneratorServiceImpl implements OtpGenerator<OtpGeneratorRequest
 			
 			OtpEntity otp = new OtpEntity();
 			otp.setId(OtpManagerUtils.getKeyOtpHash(otpDto.getKey(), generatedOtp));
+			otp.setRefId(refIdHash);
 			otp.setValidationRetryCount(0);
 			otpRepository.save(otp);
 			response.setOtp(generatedOtp);
