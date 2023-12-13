@@ -72,19 +72,23 @@ public class OtpGeneratorServiceImpl implements OtpGenerator<OtpGeneratorRequest
 		/*
 		 * Checking whether the key exists in the repository.
 		 */
-		OtpEntity keyCheck = otpRepository.findById(OtpEntity.class, otpDto.getKey());
-		if ((keyCheck != null) && (keyCheck.getStatusCode().equals(OtpStatusConstants.KEY_FREEZED.getProperty()))
-				&& (OtpManagerUtils.timeDifferenceInSeconds(keyCheck.getUpdatedDtimes(),
+		String refIdHash = OtpManagerUtils.getHash(otpDto.getKey());
+		Optional<OtpEntity> entityOpt = otpRepository.findFirstByRefIdOrderByGeneratedDtimesDesc(refIdHash);
+		if (entityOpt.isPresent() && (entityOpt.get().getStatusCode().equals(OtpStatusConstants.KEY_FREEZED.getProperty()))
+				&& (OtpManagerUtils.timeDifferenceInSeconds(entityOpt.get().getUpdatedDtimes(),
 						LocalDateTime.now(ZoneId.of("UTC"))) <= Integer.parseInt(keyFreezeTime))) {
 			response.setOtp(OtpStatusConstants.SET_AS_NULL_IN_STRING.getProperty());
 			response.setStatus(OtpStatusConstants.BLOCKED_USER.getProperty());
 		} else {
-				generatedOtp = otpProvider.computeOtp(otpDto.getKey(), otpLength, macAlgorithm);
+			generatedOtp = otpProvider.computeOtp(otpDto.getKey(), otpLength, macAlgorithm);
+			
+			if (entityOpt.isPresent()) {
+				otpRepository.delete(entityOpt.get());
+			}
 			
 			OtpEntity otp = new OtpEntity();
-			otp.setId(otpDto.getKey());
+			otp.setId(OtpManagerUtils.getKeyOtpHash(otpDto.getKey(), generatedOtp));
 			otp.setValidationRetryCount(0);
-			otp.setOtp(generatedOtp);
 			otpRepository.save(otp);
 			response.setOtp(generatedOtp);
 			response.setStatus(OtpStatusConstants.GENERATION_SUCCESSFUL.getProperty());
